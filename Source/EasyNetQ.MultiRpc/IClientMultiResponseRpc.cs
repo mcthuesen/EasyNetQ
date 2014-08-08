@@ -1,17 +1,21 @@
 ﻿using System;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
+using System.Threading.Tasks;
 using EasyNetQ.Topology;
 
 namespace EasyNetQ.MultiRpc
 {
     public interface IClientMultiResponseRpc
     {
-        IObservable<SerializedMessage> Request(
+        IDisposable Request(
             IExchange requestExchange,
             string requestRoutingKey,
             bool mandatory,
             bool immediate,
             TimeSpan timeout,
-            SerializedMessage request);
+            SerializedMessage request,
+            Action<IObservable<SerializedMessage>> subscribe);
     }
 
     class ClientMultiResponseRpc : IClientMultiResponseRpc
@@ -25,13 +29,14 @@ namespace EasyNetQ.MultiRpc
             _timeout = timeout;
         }
 
-        public IObservable<SerializedMessage> Request(
+        public IDisposable Request(
             IExchange requestExchange, 
             string requestRoutingKey, 
             bool mandatory, 
             bool immediate,
             TimeSpan timeout, 
-            SerializedMessage request)
+            SerializedMessage request,
+            Action<IObservable<SerializedMessage>> subscribe)
         {
             var correlationId = Guid.NewGuid();
             var responseQueueName = "rpc:" + correlationId;
@@ -44,26 +49,59 @@ namespace EasyNetQ.MultiRpc
                 exclusive: true,
                 autoDelete: true);
 
+            var subject = new Subject<SerializedMessage>();
+            var observable = Observable.Create<SerializedMessage>(observer => subject.Subscribe(observer));
+            subscribe(observable);
+
             //the response is published to the default exchange with the queue name as routingkey. So no need to bind to exchange
-            var continuation = _advancedBus.Consume(queue, timeout);
+            var consuming = _advancedBus.Consume(queue, (bytes, properties, arg3) => HandleMessage(subject)(new SerializedMessage(properties, bytes)));
+            //TODO set timeout to call subject + dispose consumer
 
             PublishRequest(requestExchange, requestRoutingKey, timeout, request, responseQueueName, correlationId);
-
-
-
-            return continuation
-                .Then(mcc => TaskHelpers.FromResult(new SerializedMessage(mcc.Properties, mcc.Message)))
-                .Then(sm => RpcHelpers.ExtractExceptionFromHeadersAndPropagateToTask(_rpcHeaderKeys, sm));
+            return consuming;
         }
 
-        private static void PublishRequest(IExchange requestExchange, string requestRoutingKey, TimeSpan timeout,
-                                           SerializedMessage request, string responseQueueName, Guid correlationId)
+        private Func<SerializedMessage,Task> HandleMessage(Subject<SerializedMessage> subject)
+        {
+            return sm =>
+                {
+                    try
+                    {
+                        string exceptionMessage;
+                        if (MultiRpcHelper.IsErrorMessage(sm, out exceptionMessage))
+                        {
+                            subject.OnError(new EasyNetQException(exceptionMessage));
+                        }
+                        else if (MultiRpcHelper.IsCompletedMessage(sm))
+                        {
+                            subject.OnCompleted();
+                        }
+                        else
+                        {
+                            subject.OnNext(sm);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        subject.OnError(ex);
+                    }
+                    return TaskHelpers.Completed;
+                };
+        }
+
+        private void PublishRequest(
+            IExchange requestExchange, 
+            string requestRoutingKey, 
+            TimeSpan timeout,
+            SerializedMessage request, 
+            string responseQueueName, 
+            Guid correlationId)
         {
             request.Properties.ReplyTo = responseQueueName;
             request.Properties.CorrelationId = correlationId.ToString();
             request.Properties.Expiration = timeout.TotalMilliseconds.ToString();
 
-            advancedBus.Publish(requestExchange, requestRoutingKey, false, false, request.Properties, request.Body);
+            _advancedBus.Publish(requestExchange, requestRoutingKey, false, false, request.Properties, request.Body);
         }
     }
 }
