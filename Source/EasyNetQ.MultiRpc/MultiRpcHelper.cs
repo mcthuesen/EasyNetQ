@@ -8,7 +8,7 @@ namespace EasyNetQ.MultiRpc
         public static SerializedMessage CreateErrorMessage(Exception ex)
         {
             var sm = new SerializedMessage(new MessageProperties(), new byte[] { });
-            sm.Properties.Headers.Add(MultiRpcHeaders.ExceptionMessage, ex.StackTrace);
+            sm.Properties.Headers.Add(MultiRpcHeaders.ExceptionMessage, ex.Message + ex.StackTrace); //can be null
             return sm;
         }
 

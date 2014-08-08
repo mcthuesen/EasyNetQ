@@ -13,12 +13,11 @@ namespace EasyNetQ.MultiRpc
             string requestRoutingKey,
             bool mandatory,
             bool immediate,
-            TimeSpan timeout,
             SerializedMessage request,
             Action<IObservable<SerializedMessage>> subscribe);
     }
 
-    class ClientMultiResponseRpc : IClientMultiResponseRpc
+    public class ClientMultiResponseRpc : IClientMultiResponseRpc
     {
         private readonly IAdvancedBus _advancedBus;
         private readonly TimeSpan _timeout;
@@ -34,7 +33,6 @@ namespace EasyNetQ.MultiRpc
             string requestRoutingKey, 
             bool mandatory, 
             bool immediate,
-            TimeSpan timeout, 
             SerializedMessage request,
             Action<IObservable<SerializedMessage>> subscribe)
         {
@@ -45,7 +43,7 @@ namespace EasyNetQ.MultiRpc
                 responseQueueName,
                 passive: false,
                 durable: false,
-                expires: (int)timeout.TotalMilliseconds,
+                expires: (int)_timeout.TotalMilliseconds,
                 exclusive: true,
                 autoDelete: true);
 
@@ -53,11 +51,17 @@ namespace EasyNetQ.MultiRpc
             var observable = Observable.Create<SerializedMessage>(observer => subject.Subscribe(observer));
             subscribe(observable);
 
+            
+
             //the response is published to the default exchange with the queue name as routingkey. So no need to bind to exchange
             var consuming = _advancedBus.Consume(queue, (bytes, properties, arg3) => HandleMessage(subject)(new SerializedMessage(properties, bytes)));
+
+            Observable.Create<SerializedMessage>(observer => subject.Subscribe(observer))
+                      .Subscribe(_ => { }, _ => consuming.Dispose(), consuming.Dispose);
+
             //TODO set timeout to call subject + dispose consumer
 
-            PublishRequest(requestExchange, requestRoutingKey, timeout, request, responseQueueName, correlationId);
+            PublishRequest(requestExchange, requestRoutingKey, _timeout, request, responseQueueName, correlationId);
             return consuming;
         }
 

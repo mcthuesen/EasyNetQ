@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using System.Threading.Tasks;
 using EasyNetQ.Topology;
 
@@ -9,25 +11,22 @@ namespace EasyNetQ.MultiRpc
         IDisposable Respond(string requestExchangeName,
                             string queueName,
                             string topic,
-                            Func<SerializedMessage, IObservable<SerializedMessage>> handleRequest);
+                            Func<SerializedMessage, IObserver<SerializedMessage>, Task> produceResponds);
     }
 
-    class ServerMultiResponseRpc : IServerMultiResponseRpc
+    public class ServerMultiResponseRpc : IServerMultiResponseRpc
     {
         private readonly IAdvancedBus _advancedBus;
-        private readonly IConnectionConfiguration _configuration;
 
         public ServerMultiResponseRpc(
-            IAdvancedBus advancedBus,
-            IConnectionConfiguration configuration)
+            IAdvancedBus advancedBus)
         {
             _advancedBus = advancedBus;
-            _configuration = configuration;
         }
 
-        public IDisposable Respond(string requestExchangeName, string queueName, string topic, Func<SerializedMessage, IObservable<SerializedMessage>> handleRequest)
+        public IDisposable Respond(string requestExchangeName, string queueName, string topic, Func<SerializedMessage,IObserver<SerializedMessage>, Task> produceResponds)
         {
-            var expires = (int)TimeSpan.FromSeconds(_configuration.Timeout).TotalMilliseconds;
+            var expires = (int)TimeSpan.FromSeconds(10).TotalMilliseconds;
 
             var exchange = _advancedBus.ExchangeDeclare(requestExchangeName, ExchangeType.Topic);
 
@@ -44,24 +43,36 @@ namespace EasyNetQ.MultiRpc
             var responseExchange = Exchange.GetDefault();
             return _advancedBus.Consume(
                 queue, 
-                (msgBytes, msgProp, messageRecievedInfo) => 
-                    Task.Factory.StartNew(() => ExecuteResponder(responseExchange, handleRequest, new SerializedMessage(msgProp, msgBytes))));
+                (msgBytes, msgProp, messageRecievedInfo) => ExecuteResponder(responseExchange, produceResponds, new SerializedMessage(msgProp, msgBytes)));
         }
 
         private Task ExecuteResponder(
-            IExchange responseExchange, 
-            Func<SerializedMessage, 
-            IObservable<SerializedMessage>> responder, 
+            IExchange responseExchange,
+            Func<SerializedMessage, IObserver<SerializedMessage>, Task> responder, 
             SerializedMessage requestMessage)
         {
             var tcs = new TaskCompletionSource<object>();
+            var subject = new Subject<SerializedMessage>();
+
+            
 
             //will be disposed when onCompleted or onError is called
-            var dispose = responder(requestMessage).Subscribe(
+            var dispose = Observable.Create<SerializedMessage>(observer => subject.Subscribe(observer))
+                .Subscribe(
                 OnNext(responseExchange, requestMessage),            //send reply
                 OnError(responseExchange, requestMessage, tcs),      //send error message, tcs.TrySetException(ex)
                 OnCompleted(responseExchange, requestMessage, tcs)   //() => send completed message + tcs.TrySetResult(null)
                 );
+
+            responder(requestMessage, subject)
+                .ContinueWith(task =>
+                    {
+                        if (task.IsFaulted)
+                        {
+                            subject.OnError(task.Exception != null ? (Exception)task.Exception: new EasyNetQException("UserHandler failed without exception"));
+                        }
+                    });
+
 
             return tcs.Task;
         }
