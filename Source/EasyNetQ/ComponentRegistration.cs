@@ -37,6 +37,7 @@ namespace EasyNetQ
                 .Register(sp => PublisherFactory.CreatePublisher(sp.Resolve<IConnectionConfiguration>(), sp.Resolve<IEasyNetQLogger>(), sp.Resolve<IEventBus>()))
                 .Register<IConsumerErrorStrategy, DefaultConsumerErrorStrategy>()
                 .Register<IHandlerRunner, HandlerRunner>()
+                .Register<IAckContinuationStrategy, DefaultAckContinuationStrategy>()
                 .Register<IInternalConsumerFactory, InternalConsumerFactory>()
                 .Register<IConsumerFactory, ConsumerFactory>()
                 .Register<IConnectionFactory, ConnectionFactoryWrapper>()

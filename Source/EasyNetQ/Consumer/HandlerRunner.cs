@@ -3,7 +3,6 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using EasyNetQ.Events;
-using RabbitMQ.Client;
 using RabbitMQ.Client.Exceptions;
 
 namespace EasyNetQ.Consumer
@@ -18,8 +17,9 @@ namespace EasyNetQ.Consumer
         private readonly IEasyNetQLogger logger;
         private readonly IConsumerErrorStrategy consumerErrorStrategy;
         private readonly IEventBus eventBus;
+        private readonly IAckContinuationStrategy ackContinuationStrategy;
 
-        public HandlerRunner(IEasyNetQLogger logger, IConsumerErrorStrategy consumerErrorStrategy, IEventBus eventBus)
+        public HandlerRunner(IEasyNetQLogger logger, IConsumerErrorStrategy consumerErrorStrategy, IEventBus eventBus, IAckContinuationStrategy ackContinuationStrategy)
         {
             Preconditions.CheckNotNull(logger, "logger");
             Preconditions.CheckNotNull(consumerErrorStrategy, "consumerErrorStrategy");
@@ -28,6 +28,7 @@ namespace EasyNetQ.Consumer
             this.logger = logger;
             this.consumerErrorStrategy = consumerErrorStrategy;
             this.eventBus = eventBus;
+            this.ackContinuationStrategy = ackContinuationStrategy;
         }
 
         public void InvokeUserMessageHandler(ConsumerExecutionContext context)
@@ -60,7 +61,13 @@ namespace EasyNetQ.Consumer
                 return;
             }
             
-            completionTask.ContinueWith(task => DoAck(context, GetAckStrategy(context, task)));
+            completionTask
+                .ContinueWith(task =>
+                {
+                    DoAck(context, GetAckStrategy(context, task));
+                    return task.Status == TaskStatus.RanToCompletion; //Handler succeeded
+                })
+                .ContinueWith(task => ackContinuationStrategy.AckContinuation(context, task, task.Result, task.Status == TaskStatus.RanToCompletion));
         }
 
         private AckStrategy GetAckStrategy(ConsumerExecutionContext context, Task task)
@@ -151,5 +158,4 @@ namespace EasyNetQ.Consumer
             consumerErrorStrategy.Dispose();
         }
     }
-
 }
