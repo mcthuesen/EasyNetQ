@@ -38,7 +38,7 @@ namespace EasyNetQ.Tests.HandlerRunnerTests
             var consumerErrorStrategy = MockRepository.GenerateStub<IConsumerErrorStrategy>();
             var eventBus = new EventBus();
 
-            handlerRunner = new HandlerRunner(logger, consumerErrorStrategy, eventBus);
+            handlerRunner = new HandlerRunner(logger, consumerErrorStrategy, eventBus, MockRepository.GenerateStub<IAckContinuationStrategy>());
 
             Func<byte[], MessageProperties, MessageReceivedInfo, Task> userHandler = (body, properties, info) => 
                 Task.Factory.StartNew(() =>
