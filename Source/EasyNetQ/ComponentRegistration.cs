@@ -21,7 +21,7 @@ namespace EasyNetQ
 
             // default service registration
             container
-                .Register(_ => container)       
+                .Register(_ => container)
                 .Register<IEasyNetQLogger, ConsoleLogger>()
                 .Register<ISerializer, JsonSerializer>()
                 .Register<IConventions, Conventions>()
