@@ -1,5 +1,4 @@
 ﻿using System;
-using RabbitMQ.Client;
 
 namespace EasyNetQ.SystemMessages
 {
@@ -10,6 +9,7 @@ namespace EasyNetQ.SystemMessages
     {
         public string RoutingKey { get; set; }
         public string Exchange { get; set; }
+        public string Queue { get; set; }
         public string Exception { get; set; }
         public string Message { get; set; }
         public DateTime DateTime { get; set; }

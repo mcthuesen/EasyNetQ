@@ -147,6 +147,7 @@ namespace EasyNetQ.Consumer
             return "Exception thrown by subscription callback.\n" +
                    string.Format("\tExchange:    '{0}'\n", context.Info.Exchange) +
                    string.Format("\tRouting Key: '{0}'\n", context.Info.RoutingKey) +
+                   string.Format("\tQueue Name: '{0}'\n", context.Info.Queue) +
                    string.Format("\tRedelivered: '{0}'\n", context.Info.Redelivered) +
                    string.Format("Message:\n{0}\n", message) +
                    string.Format("BasicProperties:\n{0}\n", propertiesMessage) +

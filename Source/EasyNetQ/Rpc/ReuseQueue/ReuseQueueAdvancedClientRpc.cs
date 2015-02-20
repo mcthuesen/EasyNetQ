@@ -88,8 +88,6 @@ namespace EasyNetQ.Rpc.ReuseQueue
 
         private void CreateQueueAndConsume()
         {
-            //TODO The queue is exclusive, which gives it a transient consumer. (Wait what ??)
-            //This is bad bad bad. It is relying on being a non-reconsuming (transient) consumer, due to the fact that it is exclusive. MUST BE FIXED asap
             var queue = _advancedBus.QueueDeclare(
                 _responseQueueName,
                 passive: false,
