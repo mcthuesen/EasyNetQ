@@ -43,6 +43,14 @@ namespace EasyNetQ.Rpc
 
             _advancedBus.Bind(exchange, queue, topic);
 
+            return Respond(queue, handleRequest);
+        }
+
+        public IDisposable Respond(IQueue queue, Func<SerializedMessage, MessageReceivedInfo, Task<SerializedMessage>> handleRequest)
+        {
+            Preconditions.CheckNotNull(queue, "queue");
+            Preconditions.CheckNotNull(handleRequest, "handleRequest");
+
             var responseExchange = Exchange.GetDefault();
             return _advancedBus.Consume(queue, (msgBytes, msgProp, messageRecievedInfo) => ExecuteResponder(responseExchange, handleRequest, new SerializedMessage(msgProp, msgBytes), messageRecievedInfo));
         }
