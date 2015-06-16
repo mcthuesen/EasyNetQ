@@ -57,7 +57,6 @@ namespace EasyNetQ.Consumer
             IPersistentConnection connection,
             IConsumerConfiguration configuration)
         {
-            //Bug Whether we should use a transient consumer is completely orthogonal to a queues exclusivity
             if (queue.IsExclusive)
             {
                 return new TransientConsumer(queue, onMessage, connection, configuration, internalConsumerFactory, eventBus);

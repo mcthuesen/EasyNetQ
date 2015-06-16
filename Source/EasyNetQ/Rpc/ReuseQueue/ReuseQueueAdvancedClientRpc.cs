@@ -52,7 +52,7 @@ namespace EasyNetQ.Rpc.ReuseQueue
 
             var tcs = new TaskCompletionSource<SerializedMessage>();
 
-            var timer = new Timer(state => tcs.TrySetException(new TimeoutException(string.Format("Request timed out. CorrelationId: {0}", correlationId.ToString()))));
+            var timer = new Timer(state => tcs.TrySetException(new TimeoutException(string.Format("Request timed out waiting for {0} seconds. CorrelationId: {1}", _configuration.Timeout, correlationId.ToString()))));
             timer.Change(TimeSpan.FromSeconds(_configuration.Timeout), _disablePeriodicSignaling);
 
             _responseActions.TryAdd(correlationId.ToString(), new ResponseAction

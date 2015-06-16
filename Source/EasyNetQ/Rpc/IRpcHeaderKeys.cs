@@ -3,6 +3,6 @@
     public interface IRpcHeaderKeys
     {
         string IsFaultedKey { get; }
-        string ExceptionMessageKey { get; }
+        string ExceptionKey { get; }
     }
 }

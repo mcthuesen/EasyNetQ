@@ -1,8 +1,7 @@
-﻿using System;
-using EasyNetQ.Producer;
-
-namespace EasyNetQ.Rpc.ReuseQueue
+﻿namespace EasyNetQ.Rpc.ReuseQueue
 {
+    using System;
+
     public class ReuseQueueAdvancedRpcFactory : IAdvancedRpcFactory
     {
         private readonly IConnectionConfiguration _configuration;
@@ -18,7 +17,7 @@ namespace EasyNetQ.Rpc.ReuseQueue
 
         public IAdvancedClientRpc CreateClientRpc(IAdvancedBus advancedBus)
         {
-            var responseQueueName = "rpc:" + Guid.NewGuid().ToString(); // TODO this should be changed to something more eatable
+            var responseQueueName =  "rpc:" + Guid.NewGuid(); // TODO this should be changed to something more eatable
             return new ReuseQueueAdvancedClientRpc(advancedBus, _configuration, _rpcHeaderKeys, _eventBus, responseQueueName);
         }
 
