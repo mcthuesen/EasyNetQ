@@ -38,7 +38,7 @@ namespace EasyNetQ.Rpc
                 passive: false, 
                 durable: false, 
                 exclusive: false,
-                autoDelete: true, 
+                autoDelete: false, 
                 expires: expires);
 
             _advancedBus.Bind(exchange, queue, topic);
